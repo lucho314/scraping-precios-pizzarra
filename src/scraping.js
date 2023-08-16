@@ -1,5 +1,6 @@
 import axios from 'axios';
-import cheerio from 'cheerio';
+import {load} from 'cheerio';
+import { meses } from './constants.js';
 
 const URL = 'https://www.cac.bcr.com.ar/es/precios-de-pizarra';
 
@@ -14,9 +15,12 @@ async function fetchHTML() {
 
 export async function scrapeData() {
   const html = await fetchHTML();
-  const $ = cheerio.load(html);
+  const $ = load(html);
 
   const precios = [];
+  const fechaActualizacion = $('.price-board-footer b').text().trim();
+
+  const { fecha, hora } = extractFechaHora(fechaActualizacion);
 
   $('.board-wrapper').each((index, element) => {
     const activo = $(element).find('h3').text().trim();
@@ -34,6 +38,29 @@ export async function scrapeData() {
     });
   });
 
-  return precios;
+  return { activos: precios, info: { 
+    fechaActualizacion: fecha || '',
+    horaActualizacion: hora || '',
+   } };
 }
 
+
+
+function extractFechaHora(fechaHoraActualizacion) {
+  const regexFechaHora = /(\d{2}) de ([a-zA-Z]+) del (\d{4}) - Hora: (\d{2}:\d{2}) hs\./;
+  const matches = fechaHoraActualizacion.match(regexFechaHora);
+
+  if (matches && matches.length === 5) {
+    const dia = matches[1];
+    const mes = matches[2];
+    const anio = matches[3];
+    const hora = matches[4];
+   
+    const mesNumero = meses[mes];
+
+    const fecha = `${dia}/${mesNumero}/${anio}`;
+    return { fecha, hora };
+  } else {
+    return { fecha: '', hora: '' };
+  }
+}
